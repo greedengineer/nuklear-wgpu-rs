@@ -27,6 +27,7 @@ macro_rules! align_of {
         std::mem::align_of::<$T>()
     };
 }
+
 pub enum Key {
     Shift,
     Ctrl,
@@ -41,6 +42,7 @@ pub enum Key {
     Down,
     Left,
     Right,
+    None,
 }
 
 pub enum Button {
@@ -118,11 +120,16 @@ impl Context {
         nk_input_char(&mut self.context, c as i8);
     }
     pub unsafe fn input_key(&mut self, key: Key, state: State) {
-        let s = match state {
-            State::Press => 1,
-            State::Release => 0,
+        match key {
+            Key::None => {}
+            _ => {
+                let s = match state {
+                    State::Press => 1,
+                    State::Release => 0,
+                };
+                nk_input_key(&mut self.context, convert_virtual_key(key), s);
+            }
         };
-        nk_input_key(&mut self.context, convert_virtual_key(key), s);
     }
     pub unsafe fn input_motion(&mut self, cursor_x: i32, cursor_y: i32) {
         self.cursor_x = cursor_x;
@@ -142,8 +149,8 @@ impl Context {
             s,
         );
     }
-    pub unsafe fn input_scroll(&mut self,scroll_x:f32,scroll_y:f32){
-        nk_input_scroll(&mut self.context, nk_vec2(scroll_x,scroll_y));
+    pub unsafe fn input_scroll(&mut self, scroll_x: f32, scroll_y: f32) {
+        nk_input_scroll(&mut self.context, nk_vec2(scroll_x, scroll_y));
     }
     pub unsafe fn update(&mut self, queue: &wgpu::Queue, screen_width: f32, screen_height: f32) {
         let mut ibuf: nk_buffer = std::mem::zeroed();
