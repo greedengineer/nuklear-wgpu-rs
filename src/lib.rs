@@ -27,7 +27,62 @@ macro_rules! align_of {
         std::mem::align_of::<$T>()
     };
 }
+pub enum Key {
+    Shift,
+    Ctrl,
+    Del,
+    Enter,
+    Tab,
+    BackSpace,
+    Copy,
+    Cut,
+    Paste,
+    Up,
+    Down,
+    Left,
+    Right,
+}
 
+pub enum Button {
+    Left,
+    Middle,
+    Right,
+    Double,
+}
+
+pub enum State {
+    Press,
+    Release,
+}
+
+fn convert_virtual_key(key: Key) -> i32 {
+    match key {
+        Key::Shift => nk_keys_NK_KEY_SHIFT,
+        Key::Ctrl => nk_keys_NK_KEY_SHIFT,
+        Key::Del => nk_keys_NK_KEY_SHIFT,
+        Key::Enter => nk_keys_NK_KEY_SHIFT,
+        Key::Tab => nk_keys_NK_KEY_SHIFT,
+        Key::BackSpace => nk_keys_NK_KEY_SHIFT,
+        Key::Copy => nk_keys_NK_KEY_SHIFT,
+        Key::Cut => nk_keys_NK_KEY_SHIFT,
+        Key::Paste => nk_keys_NK_KEY_SHIFT,
+        Key::Up => nk_keys_NK_KEY_SHIFT,
+        Key::Down => nk_keys_NK_KEY_SHIFT,
+        Key::Left => nk_keys_NK_KEY_SHIFT,
+        Key::Right => nk_keys_NK_KEY_SHIFT,
+        _ => nk_keys_NK_KEY_MAX,
+    }
+}
+
+fn convert_button(button: Button) -> i32 {
+    match button {
+        Button::Left => nk_buttons_NK_BUTTON_LEFT,
+        Button::Right => nk_buttons_NK_BUTTON_MIDDLE,
+        Button::Middle => nk_buttons_NK_BUTTON_RIGHT,
+        Button::Double => nk_buttons_NK_BUTTON_DOUBLE,
+        _ => nk_buttons_NK_BUTTON_MAX,
+    }
+}
 pub struct Context {
     pub context: nk_context,
     buffer: nk_buffer,
@@ -49,14 +104,48 @@ pub struct Context {
     bind_group: wgpu::BindGroup,
     indices: Vec<u8>,
     vertices: Vec<u8>,
+    cursor_x: i32,
+    cursor_y: i32,
 }
 impl Context {
-    pub unsafe fn update(
-        &mut self,
-        queue: &wgpu::Queue,
-        screen_width: f32,
-        screen_height: f32,
-    ) {
+    pub unsafe fn input_begin(&mut self) {
+        nk_input_begin(&mut self.context);
+    }
+    pub unsafe fn input_end(&mut self) {
+        nk_input_end(&mut self.context);
+    }
+    pub unsafe fn input_char(&mut self, c: char) {
+        nk_input_char(&mut self.context, c as i8);
+    }
+    pub unsafe fn input_key(&mut self, key: Key, state: State) {
+        let s = match state {
+            State::Press => 1,
+            State::Release => 0,
+        };
+        nk_input_key(&mut self.context, convert_virtual_key(key), s);
+    }
+    pub unsafe fn input_motion(&mut self, cursor_x: i32, cursor_y: i32) {
+        self.cursor_x = cursor_x;
+        self.cursor_y = cursor_y;
+        nk_input_motion(&mut self.context, cursor_x, cursor_y);
+    }
+    pub unsafe fn input_button(&mut self, button: Button, state: State) {
+        let s = match state {
+            State::Press => 1,
+            State::Release => 0,
+        };
+        nk_input_button(
+            &mut self.context,
+            convert_button(button),
+            self.cursor_x,
+            self.cursor_y,
+            s,
+        );
+    }
+    pub unsafe fn input_scroll(&mut self,scroll_x:f32,scroll_y:f32){
+        nk_input_scroll(&mut self.context, nk_vec2(scroll_x,scroll_y));
+    }
+    pub unsafe fn update(&mut self, queue: &wgpu::Queue, screen_width: f32, screen_height: f32) {
         let mut ibuf: nk_buffer = std::mem::zeroed();
         let mut vbuf: nk_buffer = std::mem::zeroed();
         nk_buffer_init_fixed(
@@ -132,34 +221,33 @@ impl Context {
         nk_init_default(&mut context, std::ptr::null_mut());
         nk_buffer_init_default(&mut buffer);
         nk_font_atlas_init_default(&mut atlas);
-        let bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: None,
-                bindings: &[
-                    wgpu::BindGroupLayoutEntry::new(
-                        0,
-                        wgpu::ShaderStage::VERTEX,
-                        wgpu::BindingType::UniformBuffer {
-                            dynamic: false,
-                            min_binding_size: wgpu::BufferSize::new(4 * 16),
-                        },
-                    ),
-                    wgpu::BindGroupLayoutEntry::new(
-                        1,
-                        wgpu::ShaderStage::FRAGMENT,
-                        wgpu::BindingType::SampledTexture {
-                            multisampled: false,
-                            component_type: wgpu::TextureComponentType::Float,
-                            dimension: wgpu::TextureViewDimension::D2,
-                        },
-                    ),
-                    wgpu::BindGroupLayoutEntry::new(
-                        2,
-                        wgpu::ShaderStage::FRAGMENT,
-                        wgpu::BindingType::Sampler { comparison: false },
-                    ),
-                ],
-            });
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: None,
+            bindings: &[
+                wgpu::BindGroupLayoutEntry::new(
+                    0,
+                    wgpu::ShaderStage::VERTEX,
+                    wgpu::BindingType::UniformBuffer {
+                        dynamic: false,
+                        min_binding_size: wgpu::BufferSize::new(4 * 16),
+                    },
+                ),
+                wgpu::BindGroupLayoutEntry::new(
+                    1,
+                    wgpu::ShaderStage::FRAGMENT,
+                    wgpu::BindingType::SampledTexture {
+                        multisampled: false,
+                        component_type: wgpu::TextureComponentType::Float,
+                        dimension: wgpu::TextureViewDimension::D2,
+                    },
+                ),
+                wgpu::BindGroupLayoutEntry::new(
+                    2,
+                    wgpu::ShaderStage::FRAGMENT,
+                    wgpu::BindingType::Sampler { comparison: false },
+                ),
+            ],
+        });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             bind_group_layouts: &[&bind_group_layout],
@@ -342,6 +430,8 @@ impl Context {
             bind_group,
             indices,
             vertices,
+            cursor_x: 0,
+            cursor_y: 0,
         }
     }
 }
