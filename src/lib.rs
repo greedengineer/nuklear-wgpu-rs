@@ -60,7 +60,7 @@ pub enum State {
 
 fn convert_virtual_key(key: Key) -> i32 {
     match key {
-        Key::None=>nk_keys_NK_KEY_MAX,
+        Key::None => nk_keys_NK_KEY_MAX,
         Key::Shift => nk_keys_NK_KEY_SHIFT,
         Key::Ctrl => nk_keys_NK_KEY_CTRL,
         Key::Del => nk_keys_NK_KEY_DEL,
@@ -138,17 +138,22 @@ impl Context {
         nk_input_motion(&mut self.context, cursor_x, cursor_y);
     }
     pub unsafe fn input_button(&mut self, button: Button, state: State) {
-        let s = match state {
-            State::Press => 1,
-            State::Release => 0,
-        };
-        nk_input_button(
-            &mut self.context,
-            convert_button(button),
-            self.cursor_x,
-            self.cursor_y,
-            s,
-        );
+        match button {
+            Button::None => {}
+            _ => {
+                let s = match state {
+                    State::Press => 1,
+                    State::Release => 0,
+                };
+                nk_input_button(
+                    &mut self.context,
+                    convert_button(button),
+                    self.cursor_x,
+                    self.cursor_y,
+                    s,
+                );
+            }
+        }
     }
     pub unsafe fn input_scroll(&mut self, scroll_x: f32, scroll_y: f32) {
         nk_input_scroll(&mut self.context, nk_vec2(scroll_x, scroll_y));
@@ -481,10 +486,10 @@ impl<'a> Renderer<'a> for wgpu::RenderPass<'a> {
                         origin_y = 0.0;
                     }
                     self.set_scissor_rect(
-                        origin_x as u32 * screen_width as u32,
-                        origin_y as u32 * screen_height as u32,
-                        (*draw_command).clip_rect.w as u32 * screen_width as u32,
-                        (*draw_command).clip_rect.h as u32 * screen_height as u32,
+                        origin_x as u32,
+                        origin_y as u32,
+                        (*draw_command).clip_rect.w as u32,
+                        (*draw_command).clip_rect.h as u32,
                     );
                     self.draw_indexed(
                         index_offset..index_offset + (*draw_command).elem_count,
