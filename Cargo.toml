@@ -7,3 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git" }
+nuklear-sys = { git = "https://github.com/greedengineer/nuklear-sys.git" }
+bytemuck = "1.2.0"
