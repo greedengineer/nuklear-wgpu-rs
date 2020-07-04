@@ -29,6 +29,7 @@ macro_rules! align_of {
 }
 
 pub enum Key {
+    None,
     Shift,
     Ctrl,
     Del,
@@ -42,7 +43,6 @@ pub enum Key {
     Down,
     Left,
     Right,
-    None,
 }
 
 pub enum Button {
@@ -59,20 +59,20 @@ pub enum State {
 
 fn convert_virtual_key(key: Key) -> i32 {
     match key {
+        Key::None=>nk_keys_NK_KEY_MAX,
         Key::Shift => nk_keys_NK_KEY_SHIFT,
-        Key::Ctrl => nk_keys_NK_KEY_SHIFT,
-        Key::Del => nk_keys_NK_KEY_SHIFT,
-        Key::Enter => nk_keys_NK_KEY_SHIFT,
-        Key::Tab => nk_keys_NK_KEY_SHIFT,
-        Key::Backspace => nk_keys_NK_KEY_SHIFT,
-        Key::Copy => nk_keys_NK_KEY_SHIFT,
-        Key::Cut => nk_keys_NK_KEY_SHIFT,
-        Key::Paste => nk_keys_NK_KEY_SHIFT,
-        Key::Up => nk_keys_NK_KEY_SHIFT,
-        Key::Down => nk_keys_NK_KEY_SHIFT,
-        Key::Left => nk_keys_NK_KEY_SHIFT,
-        Key::Right => nk_keys_NK_KEY_SHIFT,
-        _ => nk_keys_NK_KEY_MAX,
+        Key::Ctrl => nk_keys_NK_KEY_CTRL,
+        Key::Del => nk_keys_NK_KEY_DEL,
+        Key::Enter => nk_keys_NK_KEY_ENTER,
+        Key::Tab => nk_keys_NK_KEY_TAB,
+        Key::Backspace => nk_keys_NK_KEY_BACKSPACE,
+        Key::Copy => nk_keys_NK_KEY_COPY,
+        Key::Cut => nk_keys_NK_KEY_CUT,
+        Key::Paste => nk_keys_NK_KEY_PASTE,
+        Key::Up => nk_keys_NK_KEY_UP,
+        Key::Down => nk_keys_NK_KEY_DOWN,
+        Key::Left => nk_keys_NK_KEY_LEFT,
+        Key::Right => nk_keys_NK_KEY_RIGHT,
     }
 }
 
