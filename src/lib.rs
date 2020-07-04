@@ -46,6 +46,7 @@ pub enum Key {
 }
 
 pub enum Button {
+    None,
     Left,
     Middle,
     Right,
@@ -78,11 +79,11 @@ fn convert_virtual_key(key: Key) -> i32 {
 
 fn convert_button(button: Button) -> i32 {
     match button {
+        Button::None => nk_buttons_NK_BUTTON_MAX,
         Button::Left => nk_buttons_NK_BUTTON_LEFT,
         Button::Right => nk_buttons_NK_BUTTON_MIDDLE,
         Button::Middle => nk_buttons_NK_BUTTON_RIGHT,
         Button::Double => nk_buttons_NK_BUTTON_DOUBLE,
-        _ => nk_buttons_NK_BUTTON_MAX,
     }
 }
 pub struct Context {
