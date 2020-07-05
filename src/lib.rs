@@ -89,6 +89,87 @@ fn convert_button(button: Button) -> i32 {
         Button::Double => nk_buttons_NK_BUTTON_DOUBLE,
     }
 }
+
+struct Texture {
+    texture: wgpu::Texture,
+    texture_view: wgpu::TextureView,
+    sampler: wgpu::Sampler,
+    bind_group: wgpu::BindGroup,
+}
+
+impl Texture {
+    pub fn bind_group(&self)->&wgpu::BindGroup{
+        &self.bind_group
+    }
+    pub fn new(
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        bind_group_layout: &wgpu::BindGroupLayout,
+        width: u32,
+        height: u32,
+        data: &[u8],
+    ) -> Self {
+        let texture_extent = wgpu::Extent3d {
+            width,
+            height,
+            depth: 1,
+        };
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: None,
+            size: texture_extent,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8Unorm,
+            usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_DST,
+        });
+        let texture_view = texture.create_default_view();
+        queue.write_texture(
+            wgpu::TextureCopyView {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+            },
+            data,
+            wgpu::TextureDataLayout {
+                offset: 0,
+                bytes_per_row: (width * 4) as u32,
+                rows_per_image: 0,
+            },
+            texture_extent,
+        );
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::Repeat,
+            address_mode_w: wgpu::AddressMode::Repeat,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Linear,
+            ..Default::default()
+        });
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: bind_group_layout,
+            bindings: &[
+                wgpu::Binding {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&texture_view),
+                },
+                wgpu::Binding {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sampler),
+                },
+            ],
+            label: None,
+        });
+        Self {
+            texture,
+            texture_view,
+            sampler,
+            bind_group,
+        }
+    }
+}
+
 pub struct Context {
     pub context: nk_context,
     buffer: nk_buffer,
@@ -100,21 +181,18 @@ pub struct Context {
     vs_module: wgpu::ShaderModule,
     fs_module: wgpu::ShaderModule,
     pipeline: wgpu::RenderPipeline,
-
     null_texture: nk_draw_null_texture,
-    texture: wgpu::Texture,
-    texture_view: wgpu::TextureView,
-    sampler: wgpu::Sampler,
     index_buffer: wgpu::Buffer,
     vertex_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
     uniform_buffer_bind_group: wgpu::BindGroup,
-    font_texture_bind_group: wgpu::BindGroup,
+    font_texture:Texture,
     indices: Vec<u8>,
     vertices: Vec<u8>,
     cursor_x: i32,
     cursor_y: i32,
 }
+
 impl Context {
     pub unsafe fn input_begin(&mut self) {
         nk_input_begin(&mut self.context);
@@ -353,44 +431,8 @@ impl Context {
             nk_font_atlas_format_NK_FONT_ATLAS_RGBA32,
         ) as *const u8;
         let image_data = std::slice::from_raw_parts(image, (width * height * 4) as usize);
-        let texture_extent = wgpu::Extent3d {
-            width: width as u32,
-            height: height as u32,
-            depth: 1,
-        };
-        let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: None,
-            size: texture_extent,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8Unorm,
-            usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_DST,
-        });
-        let texture_view = texture.create_default_view();
-        queue.write_texture(
-            wgpu::TextureCopyView {
-                texture: &texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-            },
-            image_data,
-            wgpu::TextureDataLayout {
-                offset: 0,
-                bytes_per_row: (width * 4) as u32,
-                rows_per_image: 0,
-            },
-            texture_extent,
-        );
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            address_mode_u: wgpu::AddressMode::Repeat,
-            address_mode_v: wgpu::AddressMode::Repeat,
-            address_mode_w: wgpu::AddressMode::Repeat,
-            mag_filter: wgpu::FilterMode::Linear,
-            min_filter: wgpu::FilterMode::Linear,
-            mipmap_filter: wgpu::FilterMode::Linear,
-            ..Default::default()
-        });
+
+        let font_texture = Texture::new(device, queue,&texture_bind_layout, width as u32, height as u32, image_data);
         nk_font_atlas_end(&mut atlas, nk_handle_id(0), &mut null_texture);
         if !atlas.default_font.is_null() {
             nk_style_set_font(&mut context, &mut (*atlas.default_font).handle)
@@ -415,29 +457,12 @@ impl Context {
         });
         let uniform_buffer_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &uniform_buffer_bind_layout,
-            bindings: &[
-                wgpu::Binding {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Buffer(uniform_buffer.slice(..)),
-                },
-            ],
+            bindings: &[wgpu::Binding {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(uniform_buffer.slice(..)),
+            }],
             label: None,
         });
-        let font_texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &texture_bind_layout,
-            bindings: &[
-                wgpu::Binding {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&texture_view),
-                },
-                wgpu::Binding {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&sampler),
-                },
-            ],
-            label: None,
-        });
-
         let mut indices: Vec<u8> = Vec::new();
         indices.resize(MAX_INDEX_BUFFER_SIZE, 0);
         let mut vertices: Vec<u8> = Vec::new();
@@ -453,14 +478,11 @@ impl Context {
             fs_module,
             pipeline,
             null_texture,
-            texture,
-            texture_view,
-            sampler,
             index_buffer,
             vertex_buffer,
             uniform_buffer,
             uniform_buffer_bind_group,
-            font_texture_bind_group,
+            font_texture,
             indices,
             vertices,
             cursor_x: 0,
@@ -500,7 +522,7 @@ impl<'a> Renderer<'a> for wgpu::RenderPass<'a> {
     fn draw_gui(&mut self, context: &'a mut Context, screen_width: f32, screen_height: f32) {
         self.set_pipeline(&context.pipeline);
         self.set_bind_group(0, &context.uniform_buffer_bind_group, &[]);
-        self.set_bind_group(1, &context.font_texture_bind_group, &[]);
+        self.set_bind_group(1, context.font_texture.bind_group(), &[]);
         self.set_index_buffer(context.index_buffer.slice(..));
         self.set_vertex_buffer(0, context.vertex_buffer.slice(..));
         self.set_viewport(0.0, 0.0, screen_width, screen_height, 0.0, 1.0);
