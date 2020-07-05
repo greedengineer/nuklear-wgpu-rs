@@ -5,8 +5,8 @@ layout(location = 0) in vec4 fragColor;
 layout(location = 1) in vec2 fragUv;
 layout(location = 0) out vec4 outColor;
 
-layout(set = 0, binding = 1) uniform texture2D fontTexture;
-layout(set = 0, binding = 2) uniform sampler fontSampler;
+layout(set = 1, binding = 0) uniform texture2D fontTexture;
+layout(set = 1, binding = 1) uniform sampler fontSampler;
 
 void main() {
     vec4 texColor = texture(sampler2D(fontTexture,fontSampler), fragUv);

@@ -1,10 +1,10 @@
-use clipboard::ClipboardProvider;
 use clipboard::ClipboardContext;
+use clipboard::ClipboardProvider;
+use nuklear_sys::*;
+use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::os::raw::c_int;
 use std::os::raw::c_void;
-use std::ffi::CStr;
-use nuklear_sys::*;
 struct Vertex {
     position: [f32; 2],
     uv: [f32; 2],
@@ -94,7 +94,8 @@ pub struct Context {
     buffer: nk_buffer,
     atlas: nk_font_atlas,
 
-    bind_group_layout: wgpu::BindGroupLayout,
+    uniform_buffer_bind_layout: wgpu::BindGroupLayout,
+    texture_bind_layout: wgpu::BindGroupLayout,
     pipeline_layout: wgpu::PipelineLayout,
     vs_module: wgpu::ShaderModule,
     fs_module: wgpu::ShaderModule,
@@ -107,7 +108,8 @@ pub struct Context {
     index_buffer: wgpu::Buffer,
     vertex_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
+    uniform_buffer_bind_group: wgpu::BindGroup,
+    font_texture_bind_group: wgpu::BindGroup,
     indices: Vec<u8>,
     vertices: Vec<u8>,
     cursor_x: i32,
@@ -237,38 +239,43 @@ impl Context {
         nk_init_default(&mut context, std::ptr::null_mut());
         nk_buffer_init_default(&mut buffer);
         nk_font_atlas_init_default(&mut atlas);
-        context.clip.copy=Some(Self::copy_callback);
-        context.clip.paste=Some(Self::paste_callback);
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: None,
-            bindings: &[
-                wgpu::BindGroupLayoutEntry::new(
+        context.clip.copy = Some(Self::copy_callback);
+        context.clip.paste = Some(Self::paste_callback);
+        let uniform_buffer_bind_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: None,
+                bindings: &[wgpu::BindGroupLayoutEntry::new(
                     0,
                     wgpu::ShaderStage::VERTEX,
                     wgpu::BindingType::UniformBuffer {
                         dynamic: false,
                         min_binding_size: wgpu::BufferSize::new(4 * 16),
                     },
-                ),
-                wgpu::BindGroupLayoutEntry::new(
-                    1,
-                    wgpu::ShaderStage::FRAGMENT,
-                    wgpu::BindingType::SampledTexture {
-                        multisampled: false,
-                        component_type: wgpu::TextureComponentType::Float,
-                        dimension: wgpu::TextureViewDimension::D2,
-                    },
-                ),
-                wgpu::BindGroupLayoutEntry::new(
-                    2,
-                    wgpu::ShaderStage::FRAGMENT,
-                    wgpu::BindingType::Sampler { comparison: false },
-                ),
-            ],
-        });
+                )],
+            });
+        let texture_bind_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: None,
+                bindings: &[
+                    wgpu::BindGroupLayoutEntry::new(
+                        0,
+                        wgpu::ShaderStage::FRAGMENT,
+                        wgpu::BindingType::SampledTexture {
+                            multisampled: false,
+                            component_type: wgpu::TextureComponentType::Float,
+                            dimension: wgpu::TextureViewDimension::D2,
+                        },
+                    ),
+                    wgpu::BindGroupLayoutEntry::new(
+                        1,
+                        wgpu::ShaderStage::FRAGMENT,
+                        wgpu::BindingType::Sampler { comparison: false },
+                    ),
+                ],
+            });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            bind_group_layouts: &[&bind_group_layout],
+            bind_group_layouts: &[&uniform_buffer_bind_layout, &texture_bind_layout],
         });
 
         let vs_module = device.create_shader_module(wgpu::include_spirv!("nuklear.vert.spv"));
@@ -406,19 +413,25 @@ impl Context {
             usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
             mapped_at_creation: false,
         });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &bind_group_layout,
+        let uniform_buffer_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &uniform_buffer_bind_layout,
             bindings: &[
                 wgpu::Binding {
                     binding: 0,
                     resource: wgpu::BindingResource::Buffer(uniform_buffer.slice(..)),
                 },
+            ],
+            label: None,
+        });
+        let font_texture_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &texture_bind_layout,
+            bindings: &[
                 wgpu::Binding {
-                    binding: 1,
+                    binding: 0,
                     resource: wgpu::BindingResource::TextureView(&texture_view),
                 },
                 wgpu::Binding {
-                    binding: 2,
+                    binding: 1,
                     resource: wgpu::BindingResource::Sampler(&sampler),
                 },
             ],
@@ -433,7 +446,8 @@ impl Context {
             context,
             buffer,
             atlas,
-            bind_group_layout,
+            uniform_buffer_bind_layout,
+            texture_bind_layout,
             pipeline_layout,
             vs_module,
             fs_module,
@@ -445,7 +459,8 @@ impl Context {
             index_buffer,
             vertex_buffer,
             uniform_buffer,
-            bind_group,
+            uniform_buffer_bind_group,
+            font_texture_bind_group,
             indices,
             vertices,
             cursor_x: 0,
@@ -453,15 +468,18 @@ impl Context {
         }
     }
 
-    extern "C" fn copy_callback(handle:nk_handle,text:*const c_char,len:c_int){
+    extern "C" fn copy_callback(handle: nk_handle, text: *const c_char, len: c_int) {
         let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
-        let text = unsafe{CStr::from_ptr(text)};
-        ctx.set_contents(text.to_string_lossy().into_owned()).unwrap();
+        let text = unsafe { CStr::from_ptr(text) };
+        ctx.set_contents(text.to_string_lossy().into_owned())
+            .unwrap();
     }
-    extern "C" fn paste_callback(handle:nk_handle,edit:*mut nk_text_edit){
+    extern "C" fn paste_callback(handle: nk_handle, edit: *mut nk_text_edit) {
         let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
         let text = ctx.get_contents().unwrap();
-        unsafe{nk_textedit_paste(edit,text.as_ptr() as *const c_char,text.len() as i32);}
+        unsafe {
+            nk_textedit_paste(edit, text.as_ptr() as *const c_char, text.len() as i32);
+        }
     }
 }
 impl Drop for Context {
@@ -481,7 +499,8 @@ pub trait Renderer<'a> {
 impl<'a> Renderer<'a> for wgpu::RenderPass<'a> {
     fn draw_gui(&mut self, context: &'a mut Context, screen_width: f32, screen_height: f32) {
         self.set_pipeline(&context.pipeline);
-        self.set_bind_group(0, &context.bind_group, &[]);
+        self.set_bind_group(0, &context.uniform_buffer_bind_group, &[]);
+        self.set_bind_group(1, &context.font_texture_bind_group, &[]);
         self.set_index_buffer(context.index_buffer.slice(..));
         self.set_vertex_buffer(0, context.vertex_buffer.slice(..));
         self.set_viewport(0.0, 0.0, screen_width, screen_height, 0.0, 1.0);
