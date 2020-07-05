@@ -203,7 +203,7 @@ impl Texture {
 }
 
 pub struct Context {
-    pub context: nk_context,
+    context: nk_context,
     buffer: nk_buffer,
     atlas: nk_font_atlas,
 
@@ -227,7 +227,10 @@ pub struct Context {
 }
 
 impl Context {
-    pub unsafe fn register_image(
+    pub fn context(&mut self) -> &mut nk_context {
+        &mut self.context
+    }
+    pub unsafe fn upload_image(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
