@@ -46,6 +46,22 @@ pub enum Key {
     Down,
     Left,
     Right,
+    TextInsertMode,
+    TextReplaceMode,
+    TextResetMode,
+    TextLineStart,
+    TextLineEnd,
+    TextStart,
+    TextEnd,
+    TextUndo,
+    TextRedo,
+    TextSelectAll,
+    TextWordLeft,
+    TextWordRight,
+    ScrollStart,
+    ScrollEnd,
+    ScrollDown,
+    ScrollUp,
 }
 
 pub enum Button {
@@ -77,6 +93,22 @@ fn convert_virtual_key(key: Key) -> i32 {
         Key::Down => nk_keys_NK_KEY_DOWN,
         Key::Left => nk_keys_NK_KEY_LEFT,
         Key::Right => nk_keys_NK_KEY_RIGHT,
+        Key::TextInsertMode => nk_keys_NK_KEY_TEXT_INSERT_MODE,
+        Key::TextReplaceMode => nk_keys_NK_KEY_TEXT_REPLACE_MODE,
+        Key::TextResetMode => nk_keys_NK_KEY_TEXT_RESET_MODE,
+        Key::TextLineStart => nk_keys_NK_KEY_TEXT_LINE_START,
+        Key::TextLineEnd => nk_keys_NK_KEY_TEXT_LINE_END,
+        Key::TextStart => nk_keys_NK_KEY_TEXT_START,
+        Key::TextEnd => nk_keys_NK_KEY_TEXT_END,
+        Key::TextUndo => nk_keys_NK_KEY_TEXT_UNDO,
+        Key::TextRedo => nk_keys_NK_KEY_TEXT_REDO,
+        Key::TextSelectAll => nk_keys_NK_KEY_TEXT_SELECT_ALL,
+        Key::TextWordLeft => nk_keys_NK_KEY_TEXT_WORD_LEFT,
+        Key::TextWordRight => nk_keys_NK_KEY_TEXT_WORD_RIGHT,
+        Key::ScrollStart => nk_keys_NK_KEY_SCROLL_START,
+        Key::ScrollEnd => nk_keys_NK_KEY_SCROLL_END,
+        Key::ScrollDown => nk_keys_NK_KEY_SCROLL_DOWN,
+        Key::ScrollUp => nk_keys_NK_KEY_SCROLL_UP,
     }
 }
 
@@ -562,8 +594,12 @@ impl<'a> Renderer<'a> for wgpu::RenderPass<'a> {
                     break;
                 }
                 if (*draw_command).texture.id != 0 {
-                    self.set_bind_group(1, context.images[((*draw_command).texture.id-1) as usize].bind_group(), &[]);
-                }else{
+                    self.set_bind_group(
+                        1,
+                        context.images[((*draw_command).texture.id - 1) as usize].bind_group(),
+                        &[],
+                    );
+                } else {
                     self.set_bind_group(1, context.font_texture.bind_group(), &[]);
                 }
                 if (*draw_command).elem_count != 0 {
