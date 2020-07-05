@@ -98,7 +98,7 @@ struct Texture {
 }
 
 impl Texture {
-    pub fn bind_group(&self)->&wgpu::BindGroup{
+    pub fn bind_group(&self) -> &wgpu::BindGroup {
         &self.bind_group
     }
     pub fn new(
@@ -186,14 +186,34 @@ pub struct Context {
     vertex_buffer: wgpu::Buffer,
     uniform_buffer: wgpu::Buffer,
     uniform_buffer_bind_group: wgpu::BindGroup,
-    font_texture:Texture,
+    font_texture: Texture,
     indices: Vec<u8>,
     vertices: Vec<u8>,
     cursor_x: i32,
     cursor_y: i32,
+    images: Vec<Texture>,
 }
 
 impl Context {
+    pub unsafe fn register_image(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        width: u32,
+        height: u32,
+        data: &[u8],
+    ) -> nk_image {
+        self.images.push(Texture::new(
+            device,
+            queue,
+            &self.texture_bind_layout,
+            width,
+            height,
+            data,
+        ));
+        nk_image_id(self.images.len() as i32)
+    }
+
     pub unsafe fn input_begin(&mut self) {
         nk_input_begin(&mut self.context);
     }
@@ -432,7 +452,14 @@ impl Context {
         ) as *const u8;
         let image_data = std::slice::from_raw_parts(image, (width * height * 4) as usize);
 
-        let font_texture = Texture::new(device, queue,&texture_bind_layout, width as u32, height as u32, image_data);
+        let font_texture = Texture::new(
+            device,
+            queue,
+            &texture_bind_layout,
+            width as u32,
+            height as u32,
+            image_data,
+        );
         nk_font_atlas_end(&mut atlas, nk_handle_id(0), &mut null_texture);
         if !atlas.default_font.is_null() {
             nk_style_set_font(&mut context, &mut (*atlas.default_font).handle)
@@ -487,6 +514,7 @@ impl Context {
             vertices,
             cursor_x: 0,
             cursor_y: 0,
+            images: Vec::new(),
         }
     }
 
@@ -532,6 +560,11 @@ impl<'a> Renderer<'a> for wgpu::RenderPass<'a> {
             loop {
                 if draw_command.is_null() {
                     break;
+                }
+                if (*draw_command).texture.id != 0 {
+                    self.set_bind_group(1, context.images[((*draw_command).texture.id-1) as usize].bind_group(), &[]);
+                }else{
+                    self.set_bind_group(1, context.font_texture.bind_group(), &[]);
                 }
                 if (*draw_command).elem_count != 0 {
                     let mut origin_x = (*draw_command).clip_rect.x;
