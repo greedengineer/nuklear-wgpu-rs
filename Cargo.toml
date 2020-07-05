@@ -10,3 +10,4 @@ edition = "2018"
 wgpu = { git = "https://github.com/gfx-rs/wgpu-rs.git" }
 nuklear-sys = { git = "https://github.com/greedengineer/nuklear-sys.git" }
 bytemuck = "1.2.0"
+clipboard = "0.5.0"

@@ -1,6 +1,9 @@
+use clipboard::ClipboardProvider;
+use clipboard::ClipboardContext;
+use std::os::raw::c_char;
 use std::os::raw::c_int;
 use std::os::raw::c_void;
-
+use std::ffi::CStr;
 use nuklear_sys::*;
 struct Vertex {
     position: [f32; 2],
@@ -234,6 +237,8 @@ impl Context {
         nk_init_default(&mut context, std::ptr::null_mut());
         nk_buffer_init_default(&mut buffer);
         nk_font_atlas_init_default(&mut atlas);
+        context.clip.copy=Some(Self::copy_callback);
+        context.clip.paste=Some(Self::paste_callback);
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
             bindings: &[
@@ -446,6 +451,17 @@ impl Context {
             cursor_x: 0,
             cursor_y: 0,
         }
+    }
+
+    extern "C" fn copy_callback(handle:nk_handle,text:*const c_char,len:c_int){
+        let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
+        let text = unsafe{CStr::from_ptr(text)};
+        ctx.set_contents(text.to_string_lossy().into_owned()).unwrap();
+    }
+    extern "C" fn paste_callback(handle:nk_handle,edit:*mut nk_text_edit){
+        let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
+        let text = ctx.get_contents().unwrap();
+        unsafe{nk_textedit_paste(edit,text.as_ptr() as *const c_char,text.len() as i32);}
     }
 }
 impl Drop for Context {
