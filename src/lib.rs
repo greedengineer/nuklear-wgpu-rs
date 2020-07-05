@@ -5,6 +5,9 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::os::raw::c_int;
 use std::os::raw::c_void;
+
+pub use nuklear_sys;
+
 struct Vertex {
     position: [f32; 2],
     uv: [f32; 2],
